@@ -175,7 +175,7 @@ impl Measurement<'_> {
     /// playground around its stage).
     fn root_view(&self, cx: cx::CxCore) -> (El, cx::CxCore) {
         let (root, cx) = self.app.view(cx, self.viewport);
-        // The Windows caption buttons go over everything the view drew, in a frame around it.
+        // The caption buttons (Windows, Linux) go over everything the view drew, in a frame around it.
         let Some(caption) = &self.caption else { return (root, cx) };
         let symbol = cx.caption_color.unwrap_or(if self.env.system_dark { Color::WHITE } else { Color::BLACK });
         // At the height this run sets (`Cx::titlebar_height`, a zoom's), in this commit: the

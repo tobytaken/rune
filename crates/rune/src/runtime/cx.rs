@@ -194,16 +194,17 @@ impl<S> Cx<S> {
     #[inline(always)]
     pub fn titlebar_inset(&self) -> f32 { self.core.titlebar_inset() }
     /// What the window's own controls take of a titlebar the app draws (`App::titlebar`):
-    /// the macOS traffic lights at the leading edge, the Windows caption buttons at the
-    /// trailing edge, and the band's height. Zero where the native frame stays. Keep the
+    /// the macOS traffic lights at the leading edge, the Windows or Linux caption buttons at
+    /// the trailing edge, and the band's height. Zero where the native frame stays. Keep the
     /// titlebar's own controls clear of both ends. Headless runs report what this platform's
     /// window would.
     #[inline(always)]
     pub fn chrome_insets(&self) -> crate::ChromeInsets { self.core.chrome_insets() }
-    /// The colour of the Windows caption buttons' symbols (Electron's `titleBarOverlay`
-    /// `symbolColor`), for a titlebar whose colours follow the app's theme rather than the
-    /// system's light or dark setting: by default black in light mode, white in dark. Their
-    /// hover and press washes are this colour at 10% and 20%; close turns red either way.
+    /// The colour of the Windows and Linux caption buttons' symbols (Electron's
+    /// `titleBarOverlay` `symbolColor`), for a titlebar whose colours follow the app's theme
+    /// rather than the system's light or dark setting: by default black in light mode, white in
+    /// dark. Their hover and press washes are this colour at 10% and 20%; on Windows close turns
+    /// red either way.
     #[inline(always)]
     pub fn caption_color(&mut self, color: Color) { self.core.caption_color(color); }
     /// The theme's text colour, as CSS `color` on the page: text, icons and text fields that

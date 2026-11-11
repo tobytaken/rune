@@ -1,7 +1,8 @@
 //! A window that draws its own titlebar (`App::titlebar`): a 44 point band that drags the
 //! window, with buttons in it that keep their presses. macOS keeps its traffic lights at the
 //! leading edge; Windows draws the caption buttons at the trailing edge, with snap layouts
-//! over maximize. `Cx::chrome_insets` says what each takes. Press "Theme" to switch the app's
+//! over maximize; Linux loses its decorations, and Rune draws round caption buttons and gives
+//! the window resize edges. `Cx::chrome_insets` says what each takes. Press "Theme" to switch the app's
 //! colours away from the system's: the caption buttons follow through `Cx::caption_color`.
 //! "Zoom" scales the band with `Cx::titlebar_height`; "Dialog" opens a modal, which leaves the
 //! window's controls usable. Alt+Space in the field opens the window menu on Windows and

@@ -325,6 +325,9 @@ impl Host {
         // from it (Windows promotes touches) would press a second time.
         if matches!(event, WindowEvent::CursorMoved { .. } | WindowEvent::CursorLeft { .. } | WindowEvent::MouseInput { .. })
             && (app.rt().touching() || host_events::touch_promoted()) { return; }
+        // A Linux window without decorations: its resize edges take the pointer first.
+        #[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
+        if chrome::csd::edge_event(l, app.rt_mut(), &event, scale) { l.request_redraw(); return; }
         match event {
             WindowEvent::Moved(_) => {
                 // winit queues `ScaleFactorChanged` in `kCFRunLoopDefaultMode`, which waits
@@ -585,6 +588,8 @@ impl Host {
                             match app.rt_mut().take_titlebar_action() {
                                 Some(TitlebarAction::Drag) => {
                                     l.window.drag_window().ok();
+                                    #[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
+                                    if let Some(frame) = l.native.frame.as_mut() { frame.press_taken(); }
                                 }
                                 Some(TitlebarAction::DoubleClick) => titlebar_double_click(&l.window),
                                 None => {}

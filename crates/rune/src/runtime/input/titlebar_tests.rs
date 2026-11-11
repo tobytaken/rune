@@ -237,7 +237,9 @@ fn headless_chrome_controls_false_hides_system_controls_and_zeroes_edge_insets()
         el().key("root").w_full().h_full()
     }
 
-    let expected_height = if cfg!(any(target_os = "macos", target_os = "windows")) { 36.0 } else { 0.0 };
+    // Windows and Linux draw the caption buttons over the titlebar (Linux's client-side frame).
+    let drawn = cfg!(target_os = "windows") || crate::titlebar::CLIENT_FRAME;
+    let expected_height = if drawn || cfg!(target_os = "macos") { 36.0 } else { 0.0 };
     for rtl in [false, true] {
         let mut rt = Runtime::new(
             State { phase: 0, insets: Cell::default(), inset: Cell::default() },
@@ -259,8 +261,8 @@ fn headless_chrome_controls_false_hides_system_controls_and_zeroes_edge_insets()
         assert_eq!(rt.chrome_insets(), ChromeInsets::new(0.0, 0.0, expected_height), "rtl={rtl}");
         assert_eq!(rt.state.insets.get(), ChromeInsets::new(0.0, 0.0, expected_height), "rtl={rtl}");
         assert!(rt.tree.nodes.iter().all(|n| n.key.as_deref() != Some(crate::titlebar::BUTTONS_KEY)), "controls(false) must draw no caption buttons");
-        if cfg!(target_os = "windows") {
-            assert!(rt.tree.nodes.iter().any(|n| n.key.as_deref() == Some(crate::titlebar::FRAME_KEY)), "Windows keeps rune-frame so view paths stay stable");
+        if drawn {
+            assert!(rt.tree.nodes.iter().any(|n| n.key.as_deref() == Some(crate::titlebar::FRAME_KEY)), "Windows and Linux keep rune-frame so view paths stay stable");
         }
     }
 
@@ -274,7 +276,7 @@ fn headless_chrome_controls_false_hides_system_controls_and_zeroes_edge_insets()
     rt.headless_chrome(Chrome::DEFAULT, Some(Titlebar::new(36.0)), false);
     rt.frame(0.0);
     assert!(rt.core().headless_chrome_current().traffic_light_rects().is_some());
-    if cfg!(target_os = "windows") {
+    if drawn {
         assert!(rt.tree.nodes.iter().any(|n| n.key.as_deref() == Some(crate::titlebar::BUTTONS_KEY)));
     }
 
@@ -294,7 +296,7 @@ fn headless_chrome_controls_false_hides_system_controls_and_zeroes_edge_insets()
     // Restoring controls updates caption at commit end and marks dirty for the next frame.
     rt.frame(0.25);
     assert!(rt.core().headless_chrome_current().traffic_light_rects().is_some());
-    if cfg!(target_os = "windows") {
+    if drawn {
         assert!(has_live_caption(&rt));
         assert_eq!(rt.chrome_insets().height, 44.0);
         assert!(rt.chrome_insets().trailing > 0.0);

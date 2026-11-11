@@ -18,7 +18,7 @@ pub(in crate::runtime) struct Titlebar {
     window_menu: Option<WindowMenu>,
     /// What `Cx::chrome_insets` reports.
     pub(in crate::runtime) insets: crate::ChromeInsets,
-    /// The Windows caption buttons the view gets drawn over it, with their state.
+    /// The caption buttons (Windows, Linux) the view gets drawn over it, with their state.
     pub(in crate::runtime) caption: Option<crate::titlebar::Caption>,
     /// `Tx::toggle_maximized`, for the shell.
     pub(in crate::runtime) toggle_maximized: bool,
@@ -277,13 +277,14 @@ impl RuntimeCore {
         self.host.titlebar.headless_chrome = chrome;
         let inset = chrome.titlebar_inset();
         self.set_titlebar_inset(inset);
-        let caption = titlebar.filter(|_| cfg!(target_os = "windows")).map(|t| {
+        let drawn = cfg!(target_os = "windows") || crate::titlebar::CLIENT_FRAME;
+        let caption = titlebar.filter(|_| drawn).map(|t| {
             let mut caption = crate::titlebar::Caption::new(t.height());
             caption.hidden = !t.has_controls();
             caption.mirrored = rtl;
             caption
         });
-        let height = titlebar.filter(|_| cfg!(any(target_os = "macos", target_os = "windows"))).map_or(0.0, |t| t.height());
+        let height = titlebar.filter(|_| drawn || cfg!(target_os = "macos")).map_or(0.0, |t| t.height());
         let lights = if cfg!(target_os = "macos") { inset } else { 0.0 };
         let buttons = caption.map_or(0.0, |c| c.width(self.env.scale));
         // The traffic lights' room is on the right in a right-to-left app on macOS, as the

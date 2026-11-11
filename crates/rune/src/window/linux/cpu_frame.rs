@@ -142,7 +142,12 @@ impl Host {
         self.native_handle.native.number.store(native_window_number(&window).unwrap_or(0), Ordering::Release);
         self.win = Some(Win {
             a11y,
-            native: Native { mode: SurfaceMode::Cpu { cpu, job: GpuJob::Waiting { tries: 0, retry_at: None } }, ..Default::default() },
+            native: Native {
+                mode: SurfaceMode::Cpu { cpu, job: GpuJob::Waiting { tries: 0, retry_at: None } },
+                // The resize edges of a window with `App::titlebar` (`chrome::csd`).
+                frame: self.titlebar.map(|_| crate::window::chrome::csd::ClientFrame::default()),
+                ..Default::default()
+            },
             first_frame: FirstFrame::opened(crate::time::now()),
             surface: None,
             config,

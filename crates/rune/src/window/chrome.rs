@@ -1,5 +1,5 @@
-//! The window's controls over the app's titlebar: the macOS traffic lights and the Windows
-//! custom frame (`App::titlebar`), and what they take of it (`Cx::titlebar_inset`,
+//! The window's controls over the app's titlebar: the macOS traffic lights and the Windows and
+//! Linux custom frames (`App::titlebar`), and what they take of it (`Cx::titlebar_inset`,
 //! `Cx::chrome_insets`, the caption buttons drawn over the view).
 #![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
@@ -11,6 +11,8 @@ use crate::runtime::RuntimeCore;
 use crate::tooling::Chrome;
 use crate::window::surface::Win;
 
+#[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
+pub(in crate::window) mod csd;
 #[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
 pub(in crate::window) mod float_on_open;
 #[cfg(target_os = "macos")]
@@ -84,13 +86,13 @@ fn lights_right(w: &Win) -> bool {
 }
 
 /// Whether Rune replaced the native title bar: macOS draws the app's titlebar under its
-/// transparent one; Windows has the custom frame.
+/// transparent one; Windows has the custom frame; Linux, the client-side one.
 fn custom_frame(w: &Win) -> bool {
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android"))))]
     return w.native.frame.is_some();
     #[cfg(target_os = "macos")]
     { let _ = w; true }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows", all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))))]
     { let _ = w; false }
 }
 
@@ -105,7 +107,15 @@ fn caption(w: &Win, titlebar: Option<crate::Titlebar>) -> Option<crate::titlebar
         }
         f.caption(&w.window)
     });
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
+    return w.native.frame.as_ref().zip(titlebar).map(|(_, t)| {
+        let mut caption = crate::titlebar::Caption::new(t.height());
+        caption.maximized = w.window.is_maximized();
+        caption.maximizable = w.window.is_resizable();
+        caption.hidden = w.window.fullscreen().is_some() || !t.has_controls();
+        caption
+    });
+    #[cfg(not(any(target_os = "windows", all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))))]
     { let _ = (w, titlebar); None }
 }
 
@@ -143,6 +153,7 @@ pub(in crate::window) fn toggle_full_screen(window: &Window) {
 
 /// The window menu, where a custom titlebar (at `at`, the click's point in window points, else
 /// the pointer) or the keyboard opens it.
+/// On Linux the compositor shows it (Wayland); X11 has none to show.
 pub(in crate::window) fn window_menu(window: &Window, menu: crate::runtime::WindowMenu, at: Option<(f32, f32)>) {
     #[cfg(target_os = "windows")]
     {
@@ -150,7 +161,14 @@ pub(in crate::window) fn window_menu(window: &Window, menu: crate::runtime::Wind
         let at = at.zip(window.inner_position().ok()).map(|((x, y), o)| (o.x + (f64::from(x) * scale).round() as i32, o.y + (f64::from(y) * scale).round() as i32));
         crate::platform::win32::window_menu(window, menu, at);
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
+    {
+        // The compositor shows it (Wayland) at the click, else at the window's top-left; X11 has none.
+        let _ = menu;
+        let (x, y) = at.unwrap_or((0.0, 0.0));
+        window.show_window_menu(winit::dpi::LogicalPosition::new(x, y));
+    }
+    #[cfg(not(any(target_os = "windows", all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))))]
     let _ = (window, menu, at);
 }
 

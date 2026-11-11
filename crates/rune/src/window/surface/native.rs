@@ -1,6 +1,6 @@
 //! What a window holds per OS: on macOS its display link, present hook, panel and native
-//! views; on Linux desktops its activation helper; on Windows its first-frame cloak; elsewhere
-//! nothing.
+//! views; on Linux desktops its activation helper and client-side frame; on Windows its
+//! first-frame cloak; elsewhere nothing.
 
 #[cfg(target_os = "macos")]
 use std::sync::Arc;
@@ -73,6 +73,8 @@ mod tests;
 #[derive(Default)]
 pub(in crate::window) struct Native {
     pub(in crate::window) activator: Option<crate::platform::activation::Activator>,
+    /// The resize edges a window with `App::titlebar` has, without decorations.
+    pub(in crate::window) frame: Option<crate::window::chrome::csd::ClientFrame>,
     /// Whether the CPU renderer or the GPU draws its frames (`linux::cpu_frame`).
     #[cfg(target_os = "linux")]
     pub(in crate::window) mode: crate::window::linux::handover::SurfaceMode,
