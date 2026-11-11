@@ -195,7 +195,8 @@ impl<S: 'static> App<S> {
 
     /// Draw this window's titlebar in the view, `Titlebar::height` points tall, with the
     /// window's own controls over it (see [`crate::Titlebar`]): macOS keeps its traffic lights,
-    /// Windows gets caption buttons Rune draws, and `Cx::chrome_insets` says what they take.
+    /// Windows and Linux get caption buttons Rune draws (on Linux the window loses its system
+    /// frame and Rune adds resize edges), and `Cx::chrome_insets` says what they take.
     /// Mark the band `.window_drag()`.
     pub fn titlebar(mut self, titlebar: crate::Titlebar) -> Self {
         self.titlebar = Some(titlebar);

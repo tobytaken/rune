@@ -184,7 +184,7 @@ impl<S: 'static> Measurement<'_, S> {
             Some(playground) => playground.view(self.state, self.view, cx, self.viewport),
             None => crate::playground::call(self.view, self.state, cx),
         };
-        // The Windows caption buttons go over everything the view drew, in a frame around it.
+        // The caption buttons (Windows, Linux) go over everything the view drew, in a frame around it.
         let Some(caption) = &self.caption else { return root };
         let symbol = cx.caption_color.unwrap_or(if self.env.system_dark { Color::WHITE } else { Color::BLACK });
         // At the height this run sets (`Cx::titlebar_height`, a zoom's), in this commit: the

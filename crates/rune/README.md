@@ -1042,8 +1042,11 @@ rune::App::new(spec).fit_content_height().run();
   (Electron's `titleBarOverlay`: 46 points wide, close turns red), as elements named Minimize,
   Maximize or Restore, and Close for assistive technology, still in reach while the view holds a
   modal. A window that isn't resizable never maximizes: its maximize button is dimmed, with no snap
-  layouts. `Cx::chrome_insets()` says what the controls take (`leading`, `trailing`, `height`; zero
-  where the native frame stays, as on Linux; memos rebuild when it changes), `Cx::caption_color(c)`
+  layouts. Linux (X11 and Wayland) loses its decorations: Rune draws round 24-point caption buttons
+  in the GNOME and KDE style over the trailing edge, adds invisible resize edges (6 points, 12-point
+  corners) while the window is restored, and a right-click on a `.window_drag()` region opens the
+  compositor's window menu on Wayland. `Cx::chrome_insets()` says what the controls take (`leading`,
+  `trailing`, `height`; zero where the native frame stays; memos rebuild when it changes), `Cx::caption_color(c)`
   colours the caption symbols for an app theme, `Cx::titlebar_height(h)` changes the band's height
   as the app runs (a UI zoom), and `Tx::toggle_maximized()` maximizes or restores.
   `cargo run -p rune --example custom_titlebar` shows it.

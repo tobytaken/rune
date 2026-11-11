@@ -3,15 +3,24 @@
 //!
 //! The app declares how tall its titlebar is; Rune takes the native one away and keeps the
 //! window's controls over the app's: AppKit's traffic lights at the leading edge on macOS, and
-//! the minimize, maximize and close buttons at the trailing edge on Windows, which Rune draws
-//! as elements over the view. The app keeps clear of [`ChromeInsets`] and marks the parts
-//! that move the window with `.window_drag()`; hit targets inside them keep their presses.
+//! the minimize, maximize and close buttons at the trailing edge on Windows and Linux, which
+//! Rune draws as elements over the view. The app keeps clear of [`ChromeInsets`] and marks the
+//! parts that move the window with `.window_drag()`; hit targets inside them keep their presses.
+//! On Linux the window has no system frame at all (`csd`): Rune also gives it resize edges.
 
 use crate::Chrome;
 
 mod caption;
+mod csd;
 
 pub(crate) use caption::{BUTTONS_KEY, FRAME_KEY, frame};
+#[cfg_attr(not(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android"))), allow(unused_imports))]
+pub(crate) use csd::resize_edge;
+
+/// Whether Rune draws the whole frame of a window with a titlebar: on Linux desktops (X11 and
+/// Wayland) such a window has no decorations, and Rune draws its caption buttons and gives it
+/// resize edges.
+pub(crate) const CLIENT_FRAME: bool = cfg!(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")));
 
 /// The app draws its own titlebar across the top of the window, `height` points tall
 /// (`App::titlebar`, `WindowSpec::titlebar`). Plain data, the same on every platform:
@@ -23,6 +32,12 @@ pub(crate) use caption::{BUTTONS_KEY, FRAME_KEY, frame};
 ///   layouts flyout over maximize (Windows 11), the window menu (Alt+Space, or a right-click on
 ///   a `.window_drag()` region) and its animations; Rune draws the three caption buttons over
 ///   the trailing edge at the band's height, as Electron's `titleBarOverlay` does.
+/// - **Linux (X11 and Wayland):** no system decorations. Rune draws minimize, maximize and
+///   close as round buttons over the trailing edge, styled as GNOME and KDE draw theirs, and
+///   gives the window invisible resize edges (6 pt, 12 pt squares at the corners) while it is
+///   resizable and neither maximized nor full screen. A `.window_drag()` region moves the
+///   window, a double click on one maximizes or restores it, and a right click opens the
+///   window menu where the compositor has one (Wayland). The system draws no shadow or border.
 /// - **Elsewhere:** the native frame stays and [`ChromeInsets`] is zero.
 ///
 /// `Cx::titlebar_height` changes the height while the app runs, as a UI zoom does, and
@@ -97,13 +112,13 @@ pub struct ChromeInsets {
     /// to left (`labels::set_direction`), where the traffic lights move to the right instead. 0 in full
     /// screen and elsewhere.
     pub leading: f32,
-    /// From the window's right edge to the start of the controls there: the Windows caption
-    /// buttons, unless they're mirrored to the left, or the macOS traffic lights in a right-to-left
-    /// app. 0 in full screen and elsewhere.
+    /// From the window's right edge to the start of the controls there: the Windows or Linux
+    /// caption buttons, unless they're mirrored to the left, or the macOS traffic lights in a
+    /// right-to-left app. 0 in full screen and elsewhere.
     pub trailing: f32,
     /// The titlebar's height as the window draws it: [`Titlebar::height`] where Rune replaced
-    /// the native titlebar, 0 where the native frame stays (no `App::titlebar`, Linux, a
-    /// borderless window).
+    /// the native titlebar, 0 where the native frame stays (no `App::titlebar`, a borderless
+    /// window, a platform without custom titlebars).
     pub height: f32,
 }
 
@@ -123,7 +138,7 @@ impl ChromeInsets {
     }
 }
 
-/// One of the Windows caption buttons.
+/// One of the caption buttons (Windows and Linux).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CaptionButton {
     Minimize,
@@ -137,7 +152,8 @@ impl CaptionButton {
 
 /// Where the pointer is with the caption buttons. The system answers presses on them as
 /// non-client hits, so the buttons see neither hover nor press as pointer events: the window
-/// procedure keeps this, and the buttons draw from it.
+/// procedure keeps this, and the buttons draw from it. Linux buttons are plain elements that
+/// hover and press as any other, and stay `Idle` here.
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum CaptionState {
@@ -149,7 +165,7 @@ pub(crate) enum CaptionState {
     Pressed { button: CaptionButton, over: bool },
 }
 
-/// The caption buttons Rune draws over a custom titlebar on Windows.
+/// The caption buttons Rune draws over a custom titlebar on Windows and Linux.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Caption {
     pub height: f32,
@@ -215,6 +231,7 @@ impl Caption {
 
     /// Points the buttons take from their edge at `scale`: the right, or the left mirrored.
     pub(crate) fn width(&self, scale: f32) -> f32 {
+        if CLIENT_FRAME { return csd::width(self.buttons().len()); }
         caption::size(self.height, scale).0 * self.buttons().len() as f32
     }
 }

@@ -1,6 +1,7 @@
 //! The Windows caption buttons as elements, drawn as Electron's `titleBarOverlay` draws them
 //! (Chromium's Windows 11 icon painter): a 10 px symbol with a stroke of one device pixel,
-//! hover and press washes of the symbol colour, and a red close button.
+//! hover and press washes of the symbol colour, and a red close button. On Linux the frame
+//! holds the round buttons `csd` draws instead.
 
 use std::rc::Rc;
 
@@ -35,6 +36,7 @@ pub(super) fn size(height: f32, scale: f32) -> (f32, f32) {
 /// window's size at every zoom, as Electron's `titleBarOverlay` does.
 pub(crate) fn frame(root: El, caption: &Caption, symbol: Color, (scale, zoom): (f32, f32), fit_height: bool) -> El {
     let root = if fit_height { root.w_full() } else { root.w_full().h_full() };
+    let buttons = if super::CLIENT_FRAME { super::csd::buttons } else { buttons };
     el().key(FRAME_KEY).child(root).children((!caption.hidden).then(|| buttons(caption, symbol, scale, zoom)))
 }
 
@@ -72,24 +74,32 @@ fn caption_button(caption: &Caption, button: CaptionButton, symbol: Color, (w, h
         _ if hovered => (symbol.alpha(symbol.a * HOVER_ALPHA), symbol),
         _ => (Color::TRANSPARENT, symbol),
     };
-    let (key, label) = match button {
-        CaptionButton::Minimize => ("rune-caption-minimize", "Minimize"),
-        CaptionButton::Maximize if caption.maximized => ("rune-caption-maximize", "Restore"),
-        CaptionButton::Maximize => ("rune-caption-maximize", "Maximize"),
-        CaptionButton::Close => ("rune-caption-close", "Close"),
-    };
+    let (key, label) = identity(button, caption.maximized);
     let mut e = el().key(key).role("button").label(label).focusable(false).disabled(!enabled).size(w, h).fill(fill)
         .child(symbol_el(button, caption.maximized, ink, (w, h), scales));
     // The mouse presses them through the window procedure; assistive technology invokes these.
     // A dimmed button has nothing to invoke.
-    if enabled {
-        e.handlers.on_press = Some(Rc::new(move |_, tx: &mut crate::Tx| match button {
-            CaptionButton::Minimize => tx.minimize(),
-            CaptionButton::Maximize => tx.toggle_maximized(),
-            CaptionButton::Close => tx.close_window(),
-        }));
-    }
+    if enabled { e.handlers.on_press = Some(action(button)); }
     e
+}
+
+/// A button's key and accessible label.
+pub(super) fn identity(button: CaptionButton, maximized: bool) -> (&'static str, &'static str) {
+    match button {
+        CaptionButton::Minimize => ("rune-caption-minimize", "Minimize"),
+        CaptionButton::Maximize if maximized => ("rune-caption-maximize", "Restore"),
+        CaptionButton::Maximize => ("rune-caption-maximize", "Maximize"),
+        CaptionButton::Close => ("rune-caption-close", "Close"),
+    }
+}
+
+/// What pressing `button` does.
+pub(super) fn action(button: CaptionButton) -> crate::el::PressFn {
+    Rc::new(move |_, tx: &mut crate::Tx| match button {
+        CaptionButton::Minimize => tx.minimize(),
+        CaptionButton::Maximize => tx.toggle_maximized(),
+        CaptionButton::Close => tx.close_window(),
+    })
 }
 
 /// The symbol, laid out in device pixels so its strokes land on whole pixels: `scale` is device
@@ -122,7 +132,7 @@ fn symbol_el(button: CaptionButton, maximized: bool, ink: Color, (w, h): (f32, f
 
 /// Two rounded squares: the front one at the bottom left, and the top and right edges of the
 /// one behind it.
-fn restore(g: f32, s: f32, (scale, window): (f32, f32), ink: Color) -> Shape {
+pub(super) fn restore(g: f32, s: f32, (scale, window): (f32, f32), ink: Color) -> Shape {
     let pt = 1.0 / scale;
     let sep = 2.0 * window;
     let r = (1.5 * window).floor();
@@ -140,14 +150,14 @@ fn restore(g: f32, s: f32, (scale, window): (f32, f32), ink: Color) -> Shape {
 }
 
 /// A filled rectangle at pixel coordinates, as points.
-fn quad(x: f32, y: f32, w: f32, h: f32, pt: f32) -> Vec<[f32; 2]> {
+pub(super) fn quad(x: f32, y: f32, w: f32, h: f32, pt: f32) -> Vec<[f32; 2]> {
     vec![[x * pt, y * pt], [(x + w) * pt, y * pt], [(x + w) * pt, (y + h) * pt], [x * pt, (y + h) * pt]]
 }
 
 /// The outline of the rectangle `[left, top, right, bottom]` (pixels) with corner radii
 /// `[top-left, top-right, bottom-right, bottom-left]`, clockwise from the top-left corner's
 /// start, as points.
-fn rounded([l, t, r, b]: [f32; 4], radii: [f32; 4], pt: f32) -> Vec<[f32; 2]> {
+pub(super) fn rounded([l, t, r, b]: [f32; 4], radii: [f32; 4], pt: f32) -> Vec<[f32; 2]> {
     let corners = [([l, t], radii[0], 180.0), ([r, t], radii[1], 270.0), ([r, b], radii[2], 0.0), ([l, b], radii[3], 90.0)];
     corners.iter().flat_map(|&([x, y], radius, start)| {
         let (dx, dy) = match start as i32 { 180 => (1.0, 1.0), 270 => (-1.0, 1.0), 0 => (-1.0, -1.0), _ => (1.0, -1.0) };

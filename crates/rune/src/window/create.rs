@@ -23,6 +23,9 @@ impl<S: 'static> Host<S> {
                 attrs = winit::platform::x11::WindowAttributesExtX11::with_name(attrs, id, id);
             }
             if self.float_on_open { attrs = float_on_open::fixed(attrs, &self.options, size); }
+            // The app's titlebar is the title bar: Rune draws the caption buttons and the
+            // resize edges (`titlebar::csd`).
+            if self.titlebar.is_some() { attrs = attrs.with_decorations(false); }
             if let Some(token) = token {
                 let token = winit::window::ActivationToken::from_raw(token);
                 attrs = winit::platform::startup_notify::WindowAttributesExtStartupNotify::with_activation_token(attrs, token);
@@ -238,7 +241,9 @@ impl<S: 'static> Host<S> {
         let native = {
             Native { cloak, frame, a11y_start, ..Default::default() }
         };
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
+        let native = Native { frame: self.titlebar.map(|_| csd::ClientFrame::default()), ..Native::default() };
+        #[cfg(not(any(target_os = "macos", target_os = "windows", all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))))]
         let native = Native::default();
         self.win = Some(Win {
             a11y,

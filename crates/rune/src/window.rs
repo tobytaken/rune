@@ -40,6 +40,8 @@ mod cpu_frame;
 mod post_frame;
 #[cfg(target_os = "windows")]
 mod video_layer;
+#[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
+mod csd;
 mod native;
 use native::Native;
 mod wake;
