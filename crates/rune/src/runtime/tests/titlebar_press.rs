@@ -268,6 +268,28 @@ fn focus_loss_cancels_titlebar_press() {
     assert_eq!(rt.take_titlebar_action(), Some(TitlebarAction::DoubleClick));
 }
 
+#[test]
+fn a_press_the_window_manager_took_pairs_after_its_grab_takes_focus() {
+    // GNOME on Wayland: mutter's move grab takes keyboard focus between the two presses of a
+    // double click on a drag region, and gives it back.
+    let mut rt = Walk::new(true).rt;
+    let (x, y) = REGION;
+    rt.pointer_down(x, y);
+    assert_eq!(rt.take_titlebar_action(), Some(TitlebarAction::Drag));
+    rt.titlebar_press_taken();
+    rt.window_focus(false);
+    rt.window_focus(true);
+    rt.pointer_down(x, y);
+    assert_eq!(rt.take_titlebar_action(), Some(TitlebarAction::DoubleClick), "the second press maximizes");
+    // Only the press the window manager took: a focus loss after any other press still cancels it.
+    rt.pointer_down(x, y);
+    assert_eq!(rt.take_titlebar_action(), Some(TitlebarAction::Drag));
+    rt.window_focus(false);
+    rt.window_focus(true);
+    rt.pointer_down(x, y);
+    assert_eq!(rt.take_titlebar_action(), Some(TitlebarAction::Drag), "a cancelled press pairs with nothing");
+}
+
 /// Plays every sequence that starts with `sequence`, recording the first one that differs.
 fn visit(walk: &mut Walk, sequence: &mut Vec<Letter>, ran: &mut usize, failure: &mut Option<String>) {
     if failure.is_some() { return; }

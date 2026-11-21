@@ -248,6 +248,8 @@ impl<S: 'static> Runtime<S> {
     #[inline(always)]
     pub fn take_titlebar_action(&mut self) -> Option<TitlebarAction> { self.core_mut().take_titlebar_action() }
     #[inline(always)]
+    pub fn titlebar_press_taken(&mut self) { self.core_mut().titlebar_press_taken(); }
+    #[inline(always)]
     pub fn set_chrome_insets(&mut self, insets: crate::ChromeInsets) { self.core_mut().set_chrome_insets(insets); }
     #[inline(always)]
     pub fn chrome_insets(&self) -> crate::ChromeInsets { self.core().chrome_insets() }
