@@ -12,6 +12,10 @@ pub(super) struct Titlebar {
     pub(super) action: Option<TitlebarAction>,
     /// The press in flight (`step`).
     pub(super) press: TitlebarPress,
+    /// The window manager took the last region press to move the window (`drag_window`).
+    /// GNOME on Wayland takes keyboard focus for its move grab, so the focus loss that cancels
+    /// the pointer then must not break the pair: the next press is a double click.
+    taken: bool,
     /// Window points from the top that AppKit drags natively, over the content (0 elsewhere).
     native_band: f32,
     /// The window menu the shell opens next.
@@ -165,17 +169,23 @@ pub(super) fn step(state: &mut TitlebarPress, event: Event) -> Effects<Request> 
 impl Titlebar {
     /// A press on a `.window_drag()` region: drag, or the double-click action on its second press.
     pub(super) fn press_region(&mut self, now: f64, x: f32, y: f32, interval: f64) {
+        self.taken = false;
         self.act(Event::Region { now, point: (x, y), interval });
     }
 
     /// A press that hit nothing. In the native band AppKit moves the window itself but doesn't
     /// see the double click over the content view, so the second press asks for it here.
     pub(super) fn press_empty(&mut self, now: f64, x: f32, y: f32, interval: f64) {
+        self.taken = false;
         let band = y < self.native_band;
         self.act(Event::Empty { now, point: (x, y), interval, band });
     }
 
     pub(super) fn clear(&mut self) {
+        // The window manager's own move grab: the press it took still pairs with the next one.
+        if std::mem::take(&mut self.taken) && matches!(self.press, TitlebarPress::Armed(_)) {
+            return;
+        }
         self.act(Event::Clear);
     }
 
@@ -202,6 +212,12 @@ impl<S: 'static> Runtime<S> {
     /// must act on it before returning from that press event.
     pub fn take_titlebar_action(&mut self) -> Option<TitlebarAction> {
         self.titlebar.action.take()
+    }
+
+    /// The window manager took the press `take_titlebar_action` asked to drag with: it moves the
+    /// window, and its grab may take keyboard focus without breaking a double click.
+    pub fn titlebar_press_taken(&mut self) {
+        self.titlebar.taken = true;
     }
 
     /// What [`Cx::chrome_insets`] reports. Native windows set it from their controls on every

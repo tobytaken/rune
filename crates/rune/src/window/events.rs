@@ -534,7 +534,7 @@ impl<S: 'static> Host<S> {
                                 Some(TitlebarAction::Drag) => {
                                     let _ = l.window.drag_window();
                                     #[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
-                                    if let Some(frame) = l.native.frame.as_mut() { frame.press_taken(); }
+                                    if let Some(frame) = l.native.frame.as_mut() { frame.press_taken(); rt.titlebar_press_taken(); }
                                 }
                                 Some(TitlebarAction::DoubleClick) => titlebar_double_click(&l.window),
                                 None => {}
