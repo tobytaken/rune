@@ -255,13 +255,33 @@ impl<S: 'static> Runtime<S> {
         let inset = if borderless { 0.0 } else { chrome.titlebar_inset() };
         self.set_titlebar_inset(inset);
         let drawn = cfg!(target_os = "windows") || crate::titlebar::CLIENT_FRAME;
-        let caption = titlebar.filter(|_| drawn).map(|t| crate::titlebar::Caption::new(t.height()));
+        // The window's state as the run's own requests left it (`headless_toggles`).
+        let (maximized, full_screen) = (self.titlebar.insets.maximized, self.titlebar.insets.full_screen);
+        let caption = titlebar.filter(|_| drawn).map(|t| {
+            let mut caption = crate::titlebar::Caption::new(t.height());
+            caption.maximized = maximized;
+            caption.hidden = full_screen || (crate::titlebar::CLIENT_FRAME && !t.draws_buttons());
+            caption
+        });
         let height = titlebar.filter(|_| drawn || cfg!(target_os = "macos")).map_or(0.0, |t| t.height());
-        let leading = if cfg!(target_os = "macos") { inset } else { 0.0 };
+        let leading = if cfg!(target_os = "macos") && !full_screen { inset } else { 0.0 };
         let trailing = caption.map_or(0.0, |c| c.width(self.env.scale));
-        self.set_chrome_insets(crate::ChromeInsets::new(leading, trailing, height));
+        self.set_chrome_insets(crate::ChromeInsets::new(leading, trailing, height).with_state(maximized, full_screen));
         self.set_caption(caption);
         chrome
+    }
+
+    /// A run without a window carries out `Tx::toggle_maximized` and `Tx::toggle_full_screen`
+    /// itself when it draws `App::titlebar`, as a window would: `Cx::chrome_insets` reports the
+    /// new state from the next frame on, and full screen hides the caption buttons. The requests
+    /// stay for `take_toggle_maximized` and `take_toggle_full_screen` too.
+    pub(super) fn headless_toggles(&mut self, maximize: bool, full_screen: bool) {
+        let Some((chrome, titlebar)) = self.titlebar.headless else { return };
+        if !maximize && !full_screen { return; }
+        let insets = self.titlebar.insets;
+        self.titlebar.insets = insets.with_state(insets.maximized ^ maximize, insets.full_screen ^ full_screen);
+        self.headless_chrome(chrome, Some(titlebar), false);
+        self.dirty = true;
     }
 
     /// Takes a `Tx::toggle_maximized`, for the shell to carry out.

@@ -37,8 +37,13 @@ pub(super) fn frame_chrome(chrome: Chrome, titlebar: Option<crate::Titlebar>, se
 pub(super) fn sync_chrome<S: 'static>(rt: &mut Runtime<S>, w: &Win, chrome: Chrome, titlebar: Option<crate::Titlebar>) {
     let leading = place_chrome(&w.window, frame_chrome(chrome, titlebar, rt.titlebar_set()));
     rt.set_titlebar_inset(leading);
-    let height = titlebar.map(|t| rt.titlebar_set().over(t).height());
-    let caption = caption(w, height);
+    let titlebar = titlebar.map(|t| rt.titlebar_set().over(t));
+    let height = titlebar.map(|t| t.height());
+    let mut caption = caption(w, height);
+    // An app that draws the buttons itself gets none of Rune's over its titlebar (Linux).
+    if let Some(c) = caption.as_mut().filter(|_| crate::titlebar::CLIENT_FRAME && titlebar.is_some_and(|t| !t.draws_buttons())) {
+        c.hidden = true;
+    }
     let scale = w.window.scale_factor() as f32;
     let height = height.filter(|_| custom_frame(w)).unwrap_or(0.0);
     let buttons = caption.map_or(0.0, |c| c.width(scale));
@@ -46,7 +51,8 @@ pub(super) fn sync_chrome<S: 'static>(rt: &mut Runtime<S>, w: &Win, chrome: Chro
     // buttons' is on the left on Windows.
     let (left, right) = if lights_right(w) { (0.0, leading) } else { (leading, 0.0) };
     let (left, right) = if caption.is_some_and(|c| c.mirrored) { (left + buttons, right) } else { (left, right + buttons) };
-    rt.set_chrome_insets(crate::ChromeInsets::new(left, right, height));
+    let (maximized, full_screen) = (w.window.is_maximized(), w.window.fullscreen().is_some());
+    rt.set_chrome_insets(crate::ChromeInsets::new(left, right, height).with_state(maximized, full_screen));
     rt.set_caption(caption);
 }
 
