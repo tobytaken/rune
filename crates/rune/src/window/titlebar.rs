@@ -58,6 +58,21 @@ impl Titlebar {
         Self { height, traffic_lights: None, controls: true }
     }
 
+    /// Linux: the app draws the window's buttons itself, where its desktop's button layout puts
+    /// them, and presses them with `Tx::minimize`, `Tx::toggle_maximized` and
+    /// `Tx::close_window`, as GTK's header bars and Chrome's and Firefox's tab strips do. Rune
+    /// draws no caption buttons over the titlebar, and [`ChromeInsets`] takes no room for them
+    /// but says whether the window is maximized or full screen, for the app's own Maximize or
+    /// Restore. The window keeps its client-side frame: resize edges, `.window_drag()` regions
+    /// and the window menu. Headless runs draw none either. Ignored on Windows, whose frame
+    /// answers presses on its caption buttons itself, and on macOS, which keeps its traffic
+    /// lights. On Linux it is [`Self::controls`]`(false)`, and [`Self::has_controls`] says
+    /// whether Rune draws the buttons.
+    pub const fn without_buttons(mut self) -> Self {
+        if CLIENT_FRAME { self.controls = false; }
+        self
+    }
+
     /// macOS: the close button's top-left, in points from the window's top-left, for this
     /// titlebar (Electron's `trafficLightPosition`), in place of `Chrome::traffic_lights` and
     /// the band's middle. Ignored elsewhere and in full screen.
@@ -200,21 +215,36 @@ pub struct ChromeInsets {
     /// the native titlebar, 0 where the native frame stays (no `App::titlebar`, a borderless
     /// window, a platform without custom titlebars).
     pub height: f32,
+    /// The window is maximized, as its Maximize button shows Restore: for an app that draws the
+    /// buttons itself ([`Titlebar::without_buttons`]). A headless run with `App::titlebar`
+    /// keeps what `Tx::toggle_maximized` asked for.
+    pub maximized: bool,
+    /// The window is full screen (`Tx::toggle_full_screen`, `App::full_screen`), and its
+    /// controls hide. A headless run with `App::titlebar` keeps what `Tx::toggle_full_screen`
+    /// asked for.
+    pub full_screen: bool,
 }
 
 impl ChromeInsets {
     pub(crate) fn new(leading: f32, trailing: f32, height: f32) -> Self {
-        Self { leading, trailing, height }
+        Self { leading, trailing, height, maximized: false, full_screen: false }
+    }
+
+    /// These insets, for a window that is `maximized` and `full_screen` or not.
+    pub(crate) fn with_state(self, maximized: bool, full_screen: bool) -> Self {
+        Self { maximized, full_screen, ..self }
     }
 
     /// The insets, in window points, in the points of a view zoomed `k` times (`Cx::zoom`).
     pub(crate) fn zoomed(self, k: f32) -> Self {
-        Self { leading: self.leading / k, trailing: self.trailing / k, height: self.height / k }
+        Self { leading: self.leading / k, trailing: self.trailing / k, height: self.height / k, ..self }
     }
 
-    /// The bits a memo scope hashes, so memos rebuild when the insets change.
-    pub(crate) fn bits(&self) -> [u32; 3] {
-        [self.leading, self.trailing, self.height].map(f32::to_bits)
+    /// The bits a memo scope hashes, so memos rebuild when the insets or the window's state
+    /// change.
+    pub(crate) fn bits(&self) -> [u32; 4] {
+        let [leading, trailing, height] = [self.leading, self.trailing, self.height].map(f32::to_bits);
+        [leading, trailing, height, u32::from(self.maximized) | u32::from(self.full_screen) << 1]
     }
 }
 

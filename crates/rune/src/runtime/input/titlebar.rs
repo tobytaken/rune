@@ -294,22 +294,38 @@ impl RuntimeCore {
         let inset = chrome.titlebar_inset();
         self.set_titlebar_inset(inset);
         let drawn = cfg!(target_os = "windows") || crate::titlebar::CLIENT_FRAME;
+        // The window's state as the run's own requests left it (`headless_toggles`).
+        let (maximized, full_screen) = (self.host.titlebar.insets.maximized, self.host.titlebar.insets.full_screen);
         let caption = titlebar.filter(|_| drawn).map(|t| {
             let mut caption = crate::titlebar::Caption::new(t.height());
-            caption.hidden = !t.has_controls();
+            caption.maximized = maximized;
+            caption.hidden = full_screen || !t.has_controls();
             caption.mirrored = rtl;
             caption
         });
         let height = titlebar.filter(|_| drawn || cfg!(target_os = "macos")).map_or(0.0, |t| t.height());
-        let lights = if cfg!(target_os = "macos") { inset } else { 0.0 };
+        let lights = if cfg!(target_os = "macos") && !full_screen { inset } else { 0.0 };
         let buttons = caption.map_or(0.0, |c| c.width(self.env.scale));
         // The traffic lights' room is on the right in a right-to-left app on macOS, as the
         // caption buttons' is on the left on Windows.
         let (leading, trailing) = if rtl { (0.0, lights) } else { (lights, 0.0) };
         let (leading, trailing) = if caption.is_some_and(|c| c.mirrored) { (leading + buttons, trailing) } else { (leading, trailing + buttons) };
-        self.set_chrome_insets(crate::ChromeInsets::new(leading, trailing, height));
+        self.set_chrome_insets(crate::ChromeInsets::new(leading, trailing, height).with_state(maximized, full_screen));
         self.set_caption(caption);
         chrome
+    }
+
+    /// A run without a window carries out `Tx::toggle_maximized` and `Tx::toggle_full_screen`
+    /// itself when it draws `App::titlebar`, as a window would: `Cx::chrome_insets` reports the
+    /// new state from the next frame on, and full screen hides the caption buttons. The requests
+    /// stay for `take_toggle_maximized` and `take_toggle_full_screen` too.
+    pub(in crate::runtime) fn headless_toggles(&mut self, maximize: bool, full_screen: bool) {
+        let Some((chrome, titlebar)) = self.host.titlebar.headless else { return };
+        if !maximize && !full_screen { return; }
+        let insets = self.host.titlebar.insets;
+        self.host.titlebar.insets = insets.with_state(insets.maximized ^ maximize, insets.full_screen ^ full_screen);
+        self.headless_chrome(chrome, Some(titlebar), false);
+        self.commit.dirty = true;
     }
 
     /// Takes a `Tx::toggle_maximized`, for the shell to carry out.

@@ -73,7 +73,8 @@ pub(in crate::window) fn sync_chrome_core(rt: &mut RuntimeCore, w: &Win, chrome:
     // buttons' is on the left on Windows.
     let (left, right) = if lights_right(w) { (0.0, leading) } else { (leading, 0.0) };
     let (left, right) = if caption.is_some_and(|c| c.mirrored) { (left + buttons, right) } else { (left, right + buttons) };
-    rt.set_chrome_insets(crate::ChromeInsets::new(left, right, height));
+    let (maximized, full_screen) = (w.window.is_maximized(), w.window.fullscreen().is_some());
+    rt.set_chrome_insets(crate::ChromeInsets::new(left, right, height).with_state(maximized, full_screen));
     rt.set_caption(caption);
 }
 

@@ -189,9 +189,9 @@ impl Measurement<'_> {
 
     /// What a memo scope hashes of the window's controls (`Cx::titlebar_inset`,
     /// `Cx::chrome_insets`), so memos that read them rebuild when they change.
-    pub(in crate::runtime) fn chrome_bits(&self) -> [u32; 4] {
-        let [leading, trailing, height] = self.chrome.bits();
-        [self.titlebar_inset.to_bits(), leading, trailing, height]
+    pub(in crate::runtime) fn chrome_bits(&self) -> [u32; 5] {
+        let [leading, trailing, height, state] = self.chrome.bits();
+        [self.titlebar_inset.to_bits(), leading, trailing, height, state]
     }
 
     pub(in crate::runtime) fn finish(self, text: &mut TextSystem, tx: &Tx) -> Measured {

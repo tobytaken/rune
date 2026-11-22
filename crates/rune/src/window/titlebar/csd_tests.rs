@@ -101,3 +101,36 @@ fn the_caption_buttons_hover_and_press_as_elements_over_a_drag_region() {
     rt.pointer_up(200.0, 20.0);
     assert_eq!(rt.state.pressed, 0);
 }
+
+#[test]
+fn an_app_that_draws_its_own_buttons_gets_none_and_keeps_the_band() {
+    let rt = framed(Some(Titlebar::new(40.0).without_buttons()), false);
+    assert_eq!(rt.chrome_insets(), crate::ChromeInsets::new(0.0, 0.0, 40.0), "no room taken for buttons");
+    assert!(rt.presented("rune-caption-close").is_none(), "Rune draws no buttons");
+    assert!(rt.elements().iter().all(|e| !e.key.as_deref().is_some_and(|k| k.starts_with("rune-caption-"))));
+}
+
+#[test]
+fn a_headless_titlebar_reports_the_maximized_and_full_screen_state_its_requests_leave() {
+    fn toggling(state: &mut State, tx: &mut crate::Tx) {
+        if state.pressed == 1 { tx.toggle_maximized(); } else { tx.toggle_full_screen(); }
+    }
+    let mut rt = framed(Some(Titlebar::new(40.0).without_buttons()), false);
+    assert!(!rt.chrome_insets().maximized && !rt.chrome_insets().full_screen);
+    rt.update(|s, tx| { s.pressed = 1; toggling(s, tx) });
+    rt.frame(0.1);
+    assert!(rt.chrome_insets().maximized, "maximized");
+    rt.update(|s, tx| { s.pressed = 2; toggling(s, tx) });
+    rt.frame(0.2);
+    let insets = rt.chrome_insets();
+    assert!(insets.maximized && insets.full_screen, "full screen over maximized");
+    rt.update(|s, tx| { s.pressed = 2; toggling(s, tx) });
+    rt.frame(0.3);
+    assert!(!rt.chrome_insets().full_screen && rt.chrome_insets().maximized, "back to maximized");
+    let mut drawn = framed(Some(Titlebar::new(40.0)), false);
+    drawn.update(|_, tx| tx.toggle_full_screen());
+    drawn.frame(0.1);
+    drawn.frame(0.2);
+    assert_eq!(drawn.chrome_insets().trailing, 0.0, "full screen hides Rune's own buttons");
+    assert!(drawn.elements().iter().all(|e| !e.key.as_deref().is_some_and(|k| k.starts_with("rune-caption-"))), "nor draws them");
+}
